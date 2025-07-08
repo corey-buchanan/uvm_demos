@@ -1,1 +1,1 @@
-Commands used
+I have an Apple-Silicon Macbook, so after hours of trying to emulate x86-64 linux and install modelsim, I relented - just paste these files into a workspace in edaplayground.com - Icarus Verilog and Verilator don't seem to have UVM support either.
