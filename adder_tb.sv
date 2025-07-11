@@ -105,6 +105,25 @@ class adder_monitor extends uvm_monitor;
   endtask
 endclass
 
+class adder_scoreboard extends uvm_scoreboard;
+  `uvm_component_utils(adder_scoreboard)
+  uvm_analysis_imp #(adder_transaction, adder_scoreboard) ap;
+  
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+    ap = new("ap", this);
+  endfunction
+  
+  function void write(adder_transaction tr);
+    if (tr.sum != tr.a + tr.b) begin
+      `uvm_error("SCB", $sformatf("Mismatch: %0d + %0d != %0d, expected: %0d", tr.a, tr.b, tr.sum, tr.a + tr.b));
+    end else begin
+      `uvm_info("SCB", $sformatf("Match: %0d + %0d = %0d", tr.a, tr.b, tr.sum), UVM_MEDIUM);
+    end
+  endfunction
+  
+endclass
+
 class adder_agent extends uvm_agent;
   `uvm_component_utils(adder_agent);
   adder_sequencer sqr;
@@ -133,6 +152,7 @@ endclass
 class adder_env extends uvm_env;
   `uvm_component_utils(adder_env);
   adder_agent agt;
+  adder_scoreboard scb;
   
   function new(string name, uvm_component parent);
     super.new(name, parent);
@@ -141,6 +161,11 @@ class adder_env extends uvm_env;
   function void build_phase(uvm_phase phase);
     super.build_phase(phase);
     agt = adder_agent::type_id::create("agt", this);
+    scb = adder_scoreboard::type_id::create("scb", this);
+  endfunction
+  
+  function void connect_phase(uvm_phase phase);
+    agt.mon.ap.connect(scb.ap);
   endfunction
 endclass
 
@@ -160,7 +185,13 @@ class adder_test extends uvm_test;
   task run_phase(uvm_phase phase);
     adder_sequence seq = adder_sequence::type_id::create("seq");
     phase.raise_objection(this);
+    
     seq.start(env.agt.sqr);
+    
+    // Add delay to allow monitor and scoreboard to process last transaction
+    @(posedge env.agt.mon.vif.clk); // Wait for one clock cycle
+    #1; // Small delta to ensure scoreboard's write completes
+    
     phase.drop_objection(this);
   endtask
 endclass
